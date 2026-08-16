@@ -10,6 +10,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.divider.MaterialDivider
@@ -40,7 +41,18 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(buildUi())
+        val root = buildUi()
+        setContentView(root)
+        // Avoid overlapping the status bar / system bars.
+        ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
+            view.setPadding(
+                view.paddingLeft,
+                insets.systemWindowInsetTop,
+                view.paddingRight,
+                insets.systemWindowInsetBottom,
+            )
+            insets
+        }
         refreshRunnable.run()
     }
 
