@@ -17,14 +17,19 @@ import kotlin.concurrent.thread
 class FidoSyncService : Service() {
     @Volatile
     private var running = false
+
     @Volatile
     private var syncRequested = true
+
     @Volatile
     private var syncInFlight = false
+
     @Volatile
     private var lastSyncReason = "service_start"
+
     @Volatile
     private var lastPromptRequestId = -1
+
     @Volatile
     private var lastObservedStoreGeneration = -1
     private val syncStateLock = Any()
@@ -40,7 +45,11 @@ class FidoSyncService : Service() {
         }
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+    override fun onStartCommand(
+        intent: Intent?,
+        flags: Int,
+        startId: Int,
+    ): Int {
         lastSyncReason = intent?.getStringExtra(EXTRA_REASON)
             ?: intent?.action
             ?: "service_restart"
@@ -123,30 +132,37 @@ class FidoSyncService : Service() {
 
     private fun maybeHandlePendingAuth() {
         val pending = FidoKernelBridge.readPendingAuthRequest() ?: return
-        Log.i(TAG, "pending auth requestId=${pending.requestId} cmd=${pending.command} rp=${pending.rpId} uv=${pending.uv} rk=${pending.rk}")
+        Log.i(
+            TAG,
+            "pending auth requestId=${pending.requestId} cmd=${pending.command} rp=${pending.rpId} uv=${pending.uv} rk=${pending.rk}",
+        )
         if (pending.requestId == lastPromptRequestId || BiometricAuthBridge.isAuthenticating) {
-            Log.i(TAG, "skip prompt requestId=${pending.requestId} last=$lastPromptRequestId authing=${BiometricAuthBridge.isAuthenticating}")
+            Log.i(
+                TAG,
+                "skip prompt requestId=${pending.requestId} last=$lastPromptRequestId authing=${BiometricAuthBridge.isAuthenticating}",
+            )
             return
         }
         lastPromptRequestId = pending.requestId
         BiometricAuthBridge.begin(pending.requestId)
         Log.i(TAG, "launching auth prompt requestId=${pending.requestId}")
-        val launch = RootShell.launchFidoAuthPromptActivity(
-            requestId = pending.requestId,
-            command = pending.command,
-            rpId = pending.rpId
-        )
+        val launch =
+            RootShell.launchFidoAuthPromptActivity(
+                requestId = pending.requestId,
+                command = pending.command,
+                rpId = pending.rpId,
+            )
         if (!launch.success) {
             Log.w(TAG, "failed to launch auth prompt requestId=${pending.requestId} output=${launch.stdout}")
             Handler(Looper.getMainLooper()).post {
-                Toast.makeText(
-                    this,
-                    getString(R.string.auth_prompt_launch_failed),
-                    Toast.LENGTH_SHORT
-                ).show()
+                Toast
+                    .makeText(
+                        this,
+                        getString(R.string.auth_prompt_launch_failed),
+                        Toast.LENGTH_SHORT,
+                    ).show()
             }
             FidoKernelBridge.deny(pending.requestId)
-            RootShell.launchAbkExtensionManager()
             BiometricAuthBridge.finish(false)
             return
         }
@@ -154,26 +170,34 @@ class FidoSyncService : Service() {
         val result = BiometricAuthBridge.await(AUTH_PROMPT_TIMEOUT_MS)
         Log.i(TAG, "auth result requestId=${pending.requestId} result=${result?.toString() ?: "timeout"}")
         when (result) {
-            true -> FidoKernelBridge.allow(pending.requestId)
-            false -> FidoKernelBridge.deny(pending.requestId)
+            true -> {
+                FidoKernelBridge.allow(pending.requestId)
+            }
+
+            false -> {
+                FidoKernelBridge.deny(pending.requestId)
+            }
+
             null -> {
                 FidoKernelBridge.deny(pending.requestId)
-                RootShell.launchAbkExtensionManager()
             }
         }
     }
 
-    private fun publishState(result: SyncResult, reason: String) {
+    private fun publishState(
+        result: SyncResult,
+        reason: String,
+    ) {
         Log.i(TAG, "publishState success=${result.success} reason=$reason message=${result.userMessage(this)}")
         runCatching {
             HostBridge(
                 resolver = contentResolver,
                 authority = ABK_EXTENSION_DEFAULT_HOST_PROVIDER,
-                extensionId = ABK_EXTENSION_DEFAULT_ID
+                extensionId = ABK_EXTENSION_DEFAULT_ID,
             ).writeState(
                 summary = result.userMessage(this),
                 success = result.success,
-                reason = reason
+                reason = reason,
             )
         }
     }
@@ -185,11 +209,12 @@ class FidoSyncService : Service() {
                 NotificationChannel(
                     CHANNEL_ID,
                     getString(R.string.service_channel_name),
-                    NotificationManager.IMPORTANCE_MIN
-                )
+                    NotificationManager.IMPORTANCE_MIN,
+                ),
             )
         }
-        return NotificationCompat.Builder(this, CHANNEL_ID)
+        return NotificationCompat
+            .Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_notify_sync_noanim)
             .setContentTitle(getString(R.string.service_title))
             .setContentText(getString(R.string.service_text))
