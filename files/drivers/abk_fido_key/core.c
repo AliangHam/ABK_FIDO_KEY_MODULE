@@ -1518,24 +1518,19 @@ static int abk_fido_load_store_locked(void)
 	pr_warn("abk_fido_key: store load failed path=%s ret=%d reason=%s\n",
 		ABK_FIDO_STORE_PATH, ret, reason[0] ? reason : "unknown");
 
-	abk_fido_dev.store_loaded = true;
-	ret = abk_fido_init_new_store_locked();
-	if (ret)
-		return ret;
-
-	if (ret == -ENOENT) {
-		abk_fido_dev.last_error[0] = '\0';
-		abk_fido_set_last_trace_locked(
-			"no persisted store found, initialized new store");
-	} else {
-		snprintf(abk_fido_dev.last_error, sizeof(abk_fido_dev.last_error),
-			 "%s, reinitialized", reason[0] ? reason :
-			 "store blob invalid");
-		abk_fido_set_last_trace_locked("store load failed: %s",
-			reason[0] ? reason : "store blob invalid");
-	}
-	abk_fido_dev.store_generation++;
-	return 0;
+	/*
+	 * 读取失败(如 /metadata 分区未解锁): 保持 store_loaded=false,
+	 * 用空 store 继续服务但不写盘, 后续每次操作都会重试加载;
+	 * 直接初始化并写盘会覆盖磁盘上已持久化的凭证。
+	 */
+	abk_fido_init_new_store_locked();
+	abk_fido_dev.store_dirty = false;
+	abk_fido_dev.store_loaded = false;
+	abk_fido_dev.last_error[0] = '\0';
+	abk_fido_set_last_trace_locked(
+		"store load deferred: %s (will retry)",
+		reason[0] ? reason : "no persisted store available");
+	return -ENOENT;
 }
 
 static int abk_fido_maybe_persist_locked(void)
@@ -1550,6 +1545,17 @@ static int abk_fido_maybe_persist_locked(void)
 	if (!ABK_FIDO_PERSIST_ENABLED) {
 		abk_fido_dev.store_dirty = false;
 		return 0;
+	}
+
+	/* store 尚未从磁盘加载(如 /metadata 未解锁)时禁止写盘,
+	 * 否则会用不完整的 store 覆盖磁盘上已持久化的凭证。 */
+	if (!abk_fido_dev.store_loaded) {
+		if (!abk_fido_load_store_locked()) {
+			/* 加载成功, 可正常持久化 */
+		} else {
+			scnprintf(reason, sizeof(reason), "store not loaded");
+			goto defer_persist;
+		}
 	}
 
 	disk = kzalloc(sizeof(*disk), GFP_KERNEL);
