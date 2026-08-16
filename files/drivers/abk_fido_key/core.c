@@ -715,14 +715,15 @@ static ssize_t abk_fido_store_blob_write(struct file *filp, struct kobject *kobj
 static struct file *abk_fido_filp_open_kernel(const char *path, int flags, umode_t mode)
 {
 	const struct cred *old;
-	struct cred *cred;
 	struct file *file;
 
-	cred = prepare_kernel_cred(NULL);
-	if (!cred)
-		return ERR_PTR(-ENOMEM);
-
-	old = override_creds(cred);
+	/*
+	 * prepare_kernel_cred(NULL) can return NULL (-> -ENOMEM) on kernels
+	 * with KernelSU/susfs hooks or LSM stacks where cred allocation or
+	 * security_prepare_creds() fails.  Bypass the whole allocation by
+	 * switching to the static init_cred, which is always available.
+	 */
+	old = override_creds(&init_cred);
 	file = filp_open(path, flags, mode);
 	revert_creds(old);
 	return file;
@@ -731,14 +732,9 @@ static struct file *abk_fido_filp_open_kernel(const char *path, int flags, umode
 static ssize_t abk_fido_kernel_read(struct file *file, void *buf, size_t len, loff_t *pos)
 {
 	const struct cred *old;
-	struct cred *cred;
 	ssize_t ret;
 
-	cred = prepare_kernel_cred(NULL);
-	if (!cred)
-		return -ENOMEM;
-
-	old = override_creds(cred);
+	old = override_creds(&init_cred);
 	ret = kernel_read(file, buf, len, pos);
 	revert_creds(old);
 	return ret;
@@ -747,14 +743,9 @@ static ssize_t abk_fido_kernel_read(struct file *file, void *buf, size_t len, lo
 static ssize_t abk_fido_kernel_write(struct file *file, const void *buf, size_t len, loff_t *pos)
 {
 	const struct cred *old;
-	struct cred *cred;
 	ssize_t ret;
 
-	cred = prepare_kernel_cred(NULL);
-	if (!cred)
-		return -ENOMEM;
-
-	old = override_creds(cred);
+	old = override_creds(&init_cred);
 	ret = kernel_write(file, buf, len, pos);
 	revert_creds(old);
 	return ret;
