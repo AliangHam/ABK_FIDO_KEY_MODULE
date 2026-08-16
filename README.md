@@ -123,6 +123,12 @@ export CUSTOM_EXTERNAL_MODULES="/run/media/xingguangcuican/Project/kernelexp/new
 
 公开模块元数据位于 `module.conf`,并且应与发布后的仓库保持一致。配套应用的元数据也会在这里导出,以便 ABK 在提供内核模块的同时提供 FIDO SQLite 镜像 APK。
 
+## 主机端接入(浏览器/WebAuthn)
+
+在 Linux 主机上使用浏览器(Firefox/Chrome 等)通过 WebAuthn 调用本 FIDO Key 的完整配置(udev 规则、snap 沙箱授权、排错),见 **[HOST_SETUP.md](HOST_SETUP.md)**。
+
+要点:需要添加 `/etc/udev/rules.d/70-fido.rules`(匹配 `18d1:4e11` 调试模式 / `2717:ff40` MTP 模式),snap 版 Firefox 还需 `TAG+="snap_firefox_firefox"` 并重启浏览器。
+
 ## 当前边界
 
 - 这是面向注册/认证流程的第一版内核侧 CTAP2 实现
