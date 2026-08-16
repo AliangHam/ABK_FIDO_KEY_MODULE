@@ -1,199 +1,225 @@
 package com.abk.extension.fido
 
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.view.Gravity
+import android.view.ViewGroup
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.TextView
 import android.widget.Toast
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
+import androidx.appcompat.app.AppCompatActivity
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.card.MaterialCardView
+import com.google.android.material.divider.MaterialDivider
+import com.google.android.material.textview.MaterialTextView
+import kotlin.concurrent.thread
 
-class MainActivity : ComponentActivity() {
+/**
+ * Native View (Material 3 components) launcher GUI for the ABK FIDO
+ * companion. Shows live kernel state and lets the user approve or deny
+ * a pending authentication request. No Compose, no com.abk.kernel.
+ */
+class MainActivity : AppCompatActivity() {
+    private val handler = Handler(Looper.getMainLooper())
+    private lateinit var statusText: TextView
+    private lateinit var gateButton: MaterialButton
+    private lateinit var pendingCard: MaterialCardView
+    private lateinit var pendingDetail: TextView
+    private lateinit var lastActionText: TextView
+    private var pendingRequestId = -1
+
+    private val refreshRunnable =
+        object : Runnable {
+            override fun run() {
+                refresh()
+                handler.postDelayed(this, 2_000)
+            }
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent {
-            MaterialTheme(colorScheme = AbkFidoColors) {
-                Surface(Modifier.fillMaxSize()) {
-                    FidoMainScreen()
-                }
-            }
-        }
-    }
-}
-
-/** Gold-on-navy MD3 palette matching the app icon. */
-private val AbkFidoColors = lightColorScheme(
-    primary = Color(0xFFB26A00),
-    onPrimary = Color.White,
-    primaryContainer = Color(0xFFFFE082),
-    onPrimaryContainer = Color(0xFF3E2A00),
-    secondary = Color(0xFF0D47A1),
-    onSecondary = Color.White,
-    secondaryContainer = Color(0xFFBBDEFB),
-    onSecondaryContainer = Color(0xFF002B57),
-    background = Color(0xFFF6F8FC),
-    surface = Color(0xFFF6F8FC),
-)
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun FidoMainScreen() {
-    val context = LocalContext.current
-    var status by remember { mutableStateOf("加载中…") }
-    var gate by remember { mutableStateOf<Boolean?>(null) }
-    var pending by remember { mutableStateOf<PendingAuthRequest?>(null) }
-    var lastAction by remember { mutableStateOf("") }
-
-    LaunchedEffect(Unit) {
-        while (true) {
-            runCatching {
-                RootShell.init()
-                val count = FidoKernelBridge.readCredentialCount()
-                val gen = FidoKernelBridge.readStoreGeneration()
-                val trace = FidoKernelBridge.readLastTrace()
-                val g = FidoKernelBridge.readAuthGate()
-                val p = FidoKernelBridge.readPendingAuthRequest()
-                status =
-                    buildString {
-                        appendLine("凭证数: ${count ?: "?"}")
-                        appendLine("store_generation: ${gen ?: "?"}")
-                        appendLine("auth_gate: ${g?.let { if (it) "开" else "关" } ?: "?"}")
-                        if (trace.isNotBlank()) appendLine("最近: $trace")
-                    }
-                gate = g
-                pending = p
-            }
-            delay(2_000)
-        }
+        setContentView(buildUi())
+        refreshRunnable.run()
     }
 
-    fun toast(message: String) {
-        // Toast must be shown on a thread with a Looper; always hop to main.
-        (context as? MainActivity)?.runOnUiThread {
-            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-        }
+    override fun onDestroy() {
+        handler.removeCallbacks(refreshRunnable)
+        super.onDestroy()
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(title = { Text("ABK FIDO Companion") })
-        },
-    ) { padding ->
-        Column(
-            modifier =
-                Modifier
-                    .padding(padding)
-                    .padding(16.dp)
-                    .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp)) {
-                    Text("驱动状态", style = MaterialTheme.typography.titleSmall)
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        status,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontFamily = FontFamily.Monospace,
-                    )
-                    if (lastAction.isNotBlank()) {
-                        Spacer(Modifier.height(8.dp))
-                        HorizontalDivider()
-                        Spacer(Modifier.height(8.dp))
-                        Text(lastAction, style = MaterialTheme.typography.bodySmall)
-                    }
-                }
+    private fun buildUi(): ViewGroup {
+        val root =
+            ScrollView(this).apply {
+                isFillViewport = true
             }
-
-            pending?.let { req ->
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp)) {
-                        Text("待认证请求 #${req.requestId}", style = MaterialTheme.typography.titleSmall)
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            "${req.command}  rp=${req.rpId}  uv=${req.uv}  rk=${req.rk}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontFamily = FontFamily.Monospace,
-                        )
-                        Spacer(Modifier.height(10.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Button(
-                                onClick = {
-                                    lastAction = "已发送: allow #${req.requestId}"
-                                    toast("允许 #${req.requestId}")
-                                    kotlin.concurrent.thread {
-                                        RootShell.init()
-                                        FidoKernelBridge.allow(req.requestId)
-                                    }
-                                },
-                            ) { Text("允许") }
-                            OutlinedButton(
-                                onClick = {
-                                    lastAction = "已发送: deny #${req.requestId}"
-                                    toast("拒绝 #${req.requestId}")
-                                    kotlin.concurrent.thread {
-                                        RootShell.init()
-                                        FidoKernelBridge.deny(req.requestId)
-                                    }
-                                },
-                            ) { Text("拒绝") }
-                        }
-                    }
-                }
+        val column =
+            LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(20), dp(20), dp(20), dp(20))
             }
+        root.addView(column, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
 
-            Button(
-                onClick = {
-                    kotlin.concurrent.thread {
-                        RootShell.init()
-                        val cur = FidoKernelBridge.readAuthGate()
-                        if (cur != null) FidoKernelBridge.setAuthGate(!cur)
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text(if (gate == true) "关闭 auth_gate" else "开启 auth_gate") }
+        // --- Status card ---
+        statusText =
+            MaterialTextView(this).apply {
+                textSize = 13f
+                setTextColor(0xFF0D47A1.toInt())
+            }
+        val statusCard =
+            MaterialCardView(this).apply {
+                radius = dp(16).toFloat()
+                cardElevation = 2f
+                setContentPadding(dp(16), dp(16), dp(16), dp(16))
+            }
+        statusCard.addView(statusText, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        column.addView(statusCard, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
 
-            OutlinedButton(
-                onClick = {
-                    kotlin.concurrent.thread {
+        lastActionText =
+            MaterialTextView(this).apply {
+                textSize = 12f
+                visibility = ViewGroup.GONE
+            }
+        column.addView(lastActionText, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        column.addView(
+            MaterialDivider(this),
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            dp(1),
+        )
+
+        // --- Pending auth card ---
+        pendingDetail =
+            MaterialTextView(this).apply {
+                textSize = 13f
+            }
+        val allowButton =
+            MaterialButton(this).apply {
+                text = "允许"
+                setOnClickListener { decide(true) }
+            }
+        val denyButton =
+            MaterialButton(this).apply {
+                text = "拒绝"
+                setOnClickListener { decide(false) }
+            }
+        pendingCard =
+            MaterialCardView(this).apply {
+                radius = dp(16).toFloat()
+                cardElevation = 2f
+                setContentPadding(dp(16), dp(16), dp(16), dp(16))
+                visibility = ViewGroup.GONE
+            }
+        val pendingCol =
+            LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+            }
+        pendingCol.addView(
+            MaterialTextView(this).apply {
+                text = "待认证请求"
+                textSize = 16f
+            },
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+        )
+        pendingCol.addView(pendingDetail, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        val btnRow =
+            LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+        btnRow.addView(allowButton)
+        btnRow.addView(denyButton)
+        pendingCol.addView(btnRow, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        pendingCard.addView(pendingCol, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        column.addView(pendingCard, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+
+        // --- Actions ---
+        gateButton =
+            MaterialButton(this).apply {
+                setOnClickListener { toggleGate() }
+            }
+        column.addView(gateButton, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+
+        column.addView(
+            MaterialButton(this).apply {
+                text = "恢复存储 (restore_metadata)"
+                setOnClickListener {
+                    thread {
                         RootShell.init()
                         val r = FidoKernelBridge.restoreMetadata()
                         toast(if (r.success) "已触发恢复" else "恢复失败: ${r.stdout}")
                     }
-                },
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text("恢复存储 (restore_metadata)") }
+                }
+            },
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+        )
+
+        return root
+    }
+
+    private fun refresh() {
+        thread {
+            RootShell.init()
+            val count = FidoKernelBridge.readCredentialCount()
+            val gen = FidoKernelBridge.readStoreGeneration()
+            val trace = FidoKernelBridge.readLastTrace()
+            val gate = FidoKernelBridge.readAuthGate()
+            val pending = FidoKernelBridge.readPendingAuthRequest()
+            handler.post {
+                val sb = StringBuilder()
+                sb.append("凭证数: ${count ?: "?"}\n")
+                sb.append("store_generation: ${gen ?: "?"}\n")
+                sb.append("auth_gate: ${gate?.let { if (it) "开" else "关" } ?: "?"}\n")
+                if (trace.isNotBlank()) sb.append("最近: $trace")
+                statusText.text = sb.toString()
+
+                gateButton.text = if (gate == true) "关闭 auth_gate" else "开启 auth_gate"
+
+                if (pending != null) {
+                    pendingRequestId = pending.requestId
+                    pendingDetail.text =
+                        "#${pending.requestId}  ${pending.command}\n" +
+                            "rp: ${pending.rpId}\n" +
+                            "uv=${pending.uv}  rk=${pending.rk}"
+                    pendingCard.visibility = ViewGroup.VISIBLE
+                } else {
+                    pendingRequestId = -1
+                    pendingCard.visibility = ViewGroup.GONE
+                }
+            }
         }
     }
+
+    private fun decide(allow: Boolean) {
+        val id = pendingRequestId
+        if (id <= 0) return
+        thread {
+            RootShell.init()
+            val r =
+                if (allow) FidoKernelBridge.allow(id)
+                else FidoKernelBridge.deny(id)
+            handler.post {
+                lastActionText.text = if (r.success) "已${if (allow) "允许" else "拒绝"} #$id" else "写入失败: ${r.stdout}"
+                lastActionText.visibility = ViewGroup.VISIBLE
+            }
+        }
+    }
+
+    private fun toggleGate() {
+        thread {
+            RootShell.init()
+            val cur = FidoKernelBridge.readAuthGate()
+            if (cur != null) FidoKernelBridge.setAuthGate(!cur)
+        }
+    }
+
+    private fun toast(message: String) {
+        handler.post {
+            Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 }

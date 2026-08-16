@@ -3,7 +3,6 @@ package com.abk.extension.fido
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.os.Build
@@ -146,7 +145,6 @@ class FidoSyncService : Service() {
         }
         lastPromptRequestId = pending.requestId
         BiometricAuthBridge.begin(pending.requestId)
-        notifyAuthRequest(pending)
         Log.i(TAG, "launching auth prompt requestId=${pending.requestId}")
         val launch =
             RootShell.launchFidoAuthPromptActivity(
@@ -184,47 +182,6 @@ class FidoSyncService : Service() {
                 FidoKernelBridge.deny(pending.requestId)
             }
         }
-        cancelAuthNotification()
-    }
-
-    private fun notifyAuthRequest(pending: PendingAuthRequest) {
-        val manager = getSystemService(NotificationManager::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            manager.createNotificationChannel(
-                NotificationChannel(
-                    AUTH_CHANNEL_ID,
-                    getString(R.string.auth_channel_name),
-                    NotificationManager.IMPORTANCE_HIGH,
-                ),
-            )
-        }
-        val contentIntent =
-            PendingIntent.getActivity(
-                this,
-                pending.requestId,
-                Intent(this, MainActivity::class.java),
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-            )
-        val notification =
-            NotificationCompat
-                .Builder(this, AUTH_CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.ic_lock_lock)
-                .setContentTitle(getString(R.string.auth_notify_title))
-                .setContentText(
-                    getString(
-                        R.string.auth_notify_text,
-                        pending.command,
-                        pending.rpId.ifBlank { "?" },
-                    ),
-                ).setContentIntent(contentIntent)
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setAutoCancel(true)
-                .build()
-        manager.notify(AUTH_NOTIFICATION_ID, notification)
-    }
-
-    private fun cancelAuthNotification() {
-        getSystemService(NotificationManager::class.java).cancel(AUTH_NOTIFICATION_ID)
     }
 
     private fun publishState(
@@ -273,7 +230,5 @@ class FidoSyncService : Service() {
 
         private const val CHANNEL_ID = "abk_fido_companion"
         private const val NOTIFICATION_ID = 1002
-        private const val AUTH_CHANNEL_ID = "abk_fido_auth"
-        private const val AUTH_NOTIFICATION_ID = 1003
     }
 }
