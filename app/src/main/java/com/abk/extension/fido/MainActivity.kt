@@ -155,7 +155,7 @@ class MainActivity : AppCompatActivity() {
 
         column.addView(
             MaterialButton(this).apply {
-                text = "恢复存储 (restore_metadata)"
+                text = "恢复存储"
                 setOnClickListener {
                     thread {
                         RootShell.init()
@@ -182,18 +182,18 @@ class MainActivity : AppCompatActivity() {
             handler.post {
                 val sb = StringBuilder()
                 sb.append("凭证数: ${count ?: "?"}\n")
-                sb.append("store_generation: ${gen ?: "?"}\n")
-                sb.append("auth_gate: ${gate?.let { if (it) "开" else "关" } ?: "?"}\n")
+                sb.append("存储代数: ${gen ?: "?"}\n")
+                sb.append("认证门禁: ${gate?.let { if (it) "开" else "关" } ?: "?"}\n")
                 if (trace.isNotBlank()) sb.append("最近: $trace")
                 statusText.text = sb.toString()
 
-                gateButton.text = if (gate == true) "关闭 auth_gate" else "开启 auth_gate"
+                gateButton.text = if (gate == true) "关闭认证门禁" else "开启认证门禁"
 
                 if (pending != null) {
                     pendingRequestId = pending.requestId
                     pendingDetail.text =
                         "#${pending.requestId}  ${pending.command}\n" +
-                            "rp: ${pending.rpId}\n" +
+                            "站点: ${pending.rpId}\n" +
                             "uv=${pending.uv}  rk=${pending.rk}"
                     pendingCard.visibility = ViewGroup.VISIBLE
                 } else {

@@ -37,24 +37,24 @@ internal object FidoKernelBridge {
     fun readPendingAuthRequest(): PendingAuthRequest? {
         val pending = RootShell.readTextFile(AUTH_PENDING_PATH)
         if (!pending.success) {
-            Log.w(TAG, "read auth_pending failed exit=${pending.exitCode} out=${pending.stdout}")
+            Log.w(TAG, "读取 auth_pending 失败 退出码=${pending.exitCode} 输出=${pending.stdout}")
             return null
         }
         if (pending.stdout.trim() != "1") return null
 
         val requestId = RootShell.readTextFile(AUTH_REQUEST_ID_PATH)
         if (!requestId.success) {
-            Log.w(TAG, "read auth_request_id failed exit=${requestId.exitCode} out=${requestId.stdout}")
+            Log.w(TAG, "读取 auth_request_id 失败 退出码=${requestId.exitCode} 输出=${requestId.stdout}")
             return null
         }
         val requestIdValue = requestId.stdout.trim().toIntOrNull()
         if (requestIdValue == null) {
-            Log.w(TAG, "parse auth_request_id failed out=${requestId.stdout}")
+            Log.w(TAG, "解析 auth_request_id 失败 输出=${requestId.stdout}")
             return null
         }
         val context = RootShell.readTextFile(AUTH_CONTEXT_PATH)
         if (!context.success) {
-            Log.w(TAG, "read auth_context failed exit=${context.exitCode} out=${context.stdout}")
+            Log.w(TAG, "读取 auth_context 失败 退出码=${context.exitCode} 输出=${context.stdout}")
             return null
         }
 

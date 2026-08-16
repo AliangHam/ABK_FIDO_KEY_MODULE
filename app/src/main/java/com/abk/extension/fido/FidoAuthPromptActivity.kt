@@ -17,9 +17,9 @@ class FidoAuthPromptActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         requestId = intent.getIntExtra(EXTRA_REQUEST_ID, -1)
-        Log.i(TAG, "onCreate requestId=$requestId expected=${BiometricAuthBridge.expectedRequestId}")
+        Log.i(TAG, "onCreate requestId=$requestId 期望=${BiometricAuthBridge.expectedRequestId}")
         if (requestId <= 0 || requestId != BiometricAuthBridge.expectedRequestId) {
-            Log.w(TAG, "finish early due to invalid request id")
+            Log.w(TAG, "请求 ID 无效,提前结束")
             finish()
             return
         }
@@ -33,7 +33,7 @@ class FidoAuthPromptActivity : FragmentActivity() {
                 BiometricManager.Authenticators.BIOMETRIC_STRONG or
                 BiometricManager.Authenticators.DEVICE_CREDENTIAL
         val canAuth = biometricManager.canAuthenticate(authenticators)
-        Log.i(TAG, "canAuthenticate=$canAuth rp=${rpId.ifBlank { command }}")
+        Log.i(TAG, "可认证=$canAuth 站点=${rpId.ifBlank { command }}")
         if (canAuth != BiometricManager.BIOMETRIC_SUCCESS) {
             sendResultAndFinish(false, getString(R.string.auth_biometric_unavailable))
             return
@@ -44,12 +44,12 @@ class FidoAuthPromptActivity : FragmentActivity() {
             ContextCompat.getMainExecutor(this),
             object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                    Log.i(TAG, "authentication succeeded requestId=$requestId")
+                    Log.i(TAG, "认证成功 requestId=$requestId")
                     sendResultAndFinish(true, null)
                 }
 
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                    Log.w(TAG, "authentication error requestId=$requestId code=$errorCode msg=$errString")
+                    Log.w(TAG, "认证错误 requestId=$requestId 码=$errorCode 消息=$errString")
                     sendResultAndFinish(
                         false,
                         if (errString.isNotBlank()) errString.toString()
@@ -70,14 +70,14 @@ class FidoAuthPromptActivity : FragmentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        Log.i(TAG, "onDestroy requestId=$requestId isResultSent=$isResultSent")
+        Log.i(TAG, "onDestroy requestId=$requestId 已发送=$isResultSent")
         sendResultAndFinish(false, null)
     }
 
     private fun sendResultAndFinish(success: Boolean, message: String?) {
         if (isResultSent) return
         isResultSent = true
-        Log.i(TAG, "sendResultAndFinish requestId=$requestId success=$success message=${message.orEmpty()}")
+        Log.i(TAG, "发送结果 requestId=$requestId 成功=$success 消息=${message.orEmpty()}")
         if (!message.isNullOrBlank()) {
             Handler(Looper.getMainLooper()).post {
                 Toast.makeText(this, message, Toast.LENGTH_SHORT).show()

@@ -11,7 +11,7 @@ import android.util.Log
 
 class FidoInitProvider : ContentProvider() {
     override fun onCreate(): Boolean {
-        Log.i(TAG, "provider init")
+        Log.i(TAG, "提供者初始化")
         context?.let {
             FidoKeepAliveJobService.schedule(it)
             startSyncService(it)

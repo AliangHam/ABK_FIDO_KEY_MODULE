@@ -58,7 +58,7 @@ internal class MetadataSyncCoordinator(context: Context) {
 
     fun syncNow(reason: String): SyncResult {
         synchronized(syncLock) {
-            val notes = mutableListOf("reason=$reason")
+            val notes = mutableListOf("原因=$reason")
 
             if (!RootShell.isRootAvailable()) {
                 notes += appContext.getString(R.string.status_root_missing)
@@ -68,10 +68,10 @@ internal class MetadataSyncCoordinator(context: Context) {
             val ensureBlobFile = RootShell.ensureEmptyFileIfMissing(METADATA_BLOB_PATH)
             when {
                 !ensureBlobFile.success -> {
-                    notes += "precreate failed for $METADATA_BLOB_PATH"
+                    notes += "预创建 $METADATA_BLOB_PATH 失败"
                 }
                 ensureBlobFile.stdout.contains("created") -> {
-                    notes += "precreated missing blob file at $METADATA_BLOB_PATH"
+                    notes += "已在 $METADATA_BLOB_PATH 创建缺失的存储文件"
                 }
             }
 
@@ -79,10 +79,10 @@ internal class MetadataSyncCoordinator(context: Context) {
 
             var activeBackend = importDatabase()
             if (activeBackend != null) {
-                notes += "imported sqlite mirror from ${activeBackend.dbPath}"
+                notes += "已从 ${activeBackend.dbPath} 导入 sqlite 镜像"
                 notes += "active_backend=${activeBackend.name}"
             } else {
-                notes += "persistent sqlite mirror not found"
+                notes += "未找到持久化 sqlite 镜像"
             }
 
             val repository = StoreSnapshotRepository(localDbFile)
@@ -95,7 +95,7 @@ internal class MetadataSyncCoordinator(context: Context) {
             when {
                 persistedBlob != null -> {
                     activeBackend = persistedBlob.backend
-                    notes += "active_backend=${persistedBlob.backend.name}"
+                    notes += "活动后端=${persistedBlob.backend.name}"
                     localBlob = syncSnapshot(
                         repository = repository,
                         currentBlob = localBlob,
@@ -105,7 +105,7 @@ internal class MetadataSyncCoordinator(context: Context) {
                     )
                     val targetCount = persistedBlob.bytes.storeCredentialCount()
                     if (targetCount < 0) {
-                        return SyncResult(false, notes + "${persistedBlob.backend.name} blob malformed")
+                        return SyncResult(false, notes + "${persistedBlob.backend.name} 存储数据损坏")
                     }
                     if (shouldRestoreKernel(kernelCredentialCount, targetCount)) {
                         val restoreFailure = restoreKernelFromBlob(
@@ -118,7 +118,7 @@ internal class MetadataSyncCoordinator(context: Context) {
                             return restoreFailure
                         }
                     } else {
-                        notes += "kernel already loaded(count=$kernelCredentialCount)"
+                        notes += "内核已加载(count=$kernelCredentialCount)"
                     }
                 }
                 localBlob != null -> {
@@ -126,15 +126,15 @@ internal class MetadataSyncCoordinator(context: Context) {
                     notes += "active_backend=${preferredBackend.name}"
                     val targetCount = localBlob.storeCredentialCount()
                     if (targetCount < 0) {
-                        return SyncResult(false, notes + "local sqlite snapshot malformed")
+                        return SyncResult(false, notes + "本地 sqlite 快照损坏")
                     }
                     if (kernelCredentialCount > 0) {
                         return SyncResult(
                             success = false,
-                            notes = notes + "persistent blob missing while kernel has credentials"
+                            notes = notes + "持久化数据缺失但内核存在凭证"
                         )
                     }
-                    notes += "persistent blob missing, restoring from sqlite snapshot"
+                    notes += "持久化数据缺失,正在从 sqlite 快照恢复"
                     val restoreFailure = restoreKernelFromBlob(
                         restoreBlob = localBlob,
                         preferredBackend = preferredBackend,
@@ -146,17 +146,17 @@ internal class MetadataSyncCoordinator(context: Context) {
                     }
                 }
                 else -> {
-                    notes += "no stored blob available"
+                    notes += "无可用持久化数据"
                 }
             }
 
             val dbBackend = activeBackend ?: PERSISTENCE_BACKENDS.first()
             val exportDbBackend = writeDatabaseToPersistence(dbBackend, notes)
             if (exportDbBackend == null) {
-                return SyncResult(false, notes + "failed to export sqlite mirror to persistent storage")
+                return SyncResult(false, notes + "导出 sqlite 镜像到持久化存储失败")
             }
-            notes += "exported sqlite mirror to ${exportDbBackend.dbPath}"
-            notes += "sqlite_backend=${exportDbBackend.name}"
+            notes += "已导出 sqlite 镜像到 ${exportDbBackend.dbPath}"
+            notes += "sqlite 后端=${exportDbBackend.name}"
             return SyncResult(true, notes)
         }
     }

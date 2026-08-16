@@ -39,7 +39,7 @@ class FidoSyncService : Service() {
         RootShell.init()
         startForeground(NOTIFICATION_ID, buildNotification())
         running = true
-        Log.i(TAG, "service created")
+        Log.i(TAG, "服务已创建")
         thread(name = "abk-fido-service-loop") {
             serviceLoop()
         }
@@ -54,13 +54,13 @@ class FidoSyncService : Service() {
             ?: intent?.action
             ?: "service_restart"
         syncRequested = true
-        Log.i(TAG, "onStartCommand reason=$lastSyncReason")
+        Log.i(TAG, "onStartCommand 原因=$lastSyncReason")
         return START_STICKY
     }
 
     override fun onDestroy() {
         running = false
-        Log.i(TAG, "service destroyed")
+        Log.i(TAG, "服务已销毁")
         super.onDestroy()
     }
 
@@ -71,13 +71,13 @@ class FidoSyncService : Service() {
             runCatching {
                 maybeHandlePendingAuth()
             }.onFailure {
-                Log.w("AbkFidoCompanion", "auth loop failed", it)
+                Log.w("AbkFidoCompanion", "认证循环失败", it)
             }
 
             runCatching {
                 maybeScheduleStoreSync()
             }.onFailure {
-                Log.w(TAG, "store generation poll failed", it)
+                Log.w(TAG, "存储代数轮询失败", it)
             }
 
             kickSyncIfNeeded()
@@ -104,7 +104,7 @@ class FidoSyncService : Service() {
             syncRequested = true
             lastSyncReason = "store_generation_$generation"
         }
-        Log.i(TAG, "detected store generation change=$generation")
+        Log.i(TAG, "检测到存储代数变化=$generation")
     }
 
     private fun kickSyncIfNeeded() {
@@ -119,7 +119,7 @@ class FidoSyncService : Service() {
         }
         thread(name = "abk-fido-sync") {
             try {
-                Log.i(TAG, "running sync reason=$reason")
+                Log.i(TAG, "执行同步 原因=$reason")
                 val result = MetadataSyncCoordinator(applicationContext).syncNow(reason)
                 publishState(result, reason)
             } finally {
@@ -134,18 +134,18 @@ class FidoSyncService : Service() {
         val pending = FidoKernelBridge.readPendingAuthRequest() ?: return
         Log.i(
             TAG,
-            "pending auth requestId=${pending.requestId} cmd=${pending.command} rp=${pending.rpId} uv=${pending.uv} rk=${pending.rk}",
+            "待认证请求 requestId=${pending.requestId} 命令=${pending.command} 站点=${pending.rpId} uv=${pending.uv} rk=${pending.rk}",
         )
         if (pending.requestId == lastPromptRequestId || BiometricAuthBridge.isAuthenticating) {
             Log.i(
                 TAG,
-                "skip prompt requestId=${pending.requestId} last=$lastPromptRequestId authing=${BiometricAuthBridge.isAuthenticating}",
+                "跳过提示 requestId=${pending.requestId} 上次=$lastPromptRequestId 认证中=${BiometricAuthBridge.isAuthenticating}",
             )
             return
         }
         lastPromptRequestId = pending.requestId
         BiometricAuthBridge.begin(pending.requestId)
-        Log.i(TAG, "launching auth prompt requestId=${pending.requestId}")
+        Log.i(TAG, "启动认证提示 requestId=${pending.requestId}")
         val launch =
             RootShell.launchFidoAuthPromptActivity(
                 requestId = pending.requestId,
@@ -153,7 +153,7 @@ class FidoSyncService : Service() {
                 rpId = pending.rpId,
             )
         if (!launch.success) {
-            Log.w(TAG, "failed to launch auth prompt requestId=${pending.requestId} output=${launch.stdout}")
+            Log.w(TAG, "启动认证提示失败 requestId=${pending.requestId} 输出=${launch.stdout}")
             Handler(Looper.getMainLooper()).post {
                 Toast
                     .makeText(
@@ -168,7 +168,7 @@ class FidoSyncService : Service() {
         }
 
         val result = BiometricAuthBridge.await(AUTH_PROMPT_TIMEOUT_MS)
-        Log.i(TAG, "auth result requestId=${pending.requestId} result=${result?.toString() ?: "timeout"}")
+        Log.i(TAG, "认证结果 requestId=${pending.requestId} 结果=${result?.toString() ?: "超时"}")
         when (result) {
             true -> {
                 FidoKernelBridge.allow(pending.requestId)
@@ -188,7 +188,7 @@ class FidoSyncService : Service() {
         result: SyncResult,
         reason: String,
     ) {
-        Log.i(TAG, "publishState success=${result.success} reason=$reason message=${result.userMessage(this)}")
+        Log.i(TAG, "状态发布 成功=${result.success} 原因=$reason 消息=${result.userMessage(this)}")
         runCatching {
             HostBridge(
                 resolver = contentResolver,
