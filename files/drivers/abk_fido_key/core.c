@@ -39,6 +39,13 @@
 
 #include <asm/unaligned.h>
 
+/*
+ * init_cred is not declared in <linux/cred.h> on Android GKI kernels
+ * (6.6+), so declare it at file scope.  A duplicate extern declaration
+ * is harmless on kernels (e.g. vendor/upstream) that do export it.
+ */
+extern struct cred init_cred;
+
 #include <crypto/ecdh.h>
 #include <crypto/ecc_curve.h>
 #include <crypto/hash.h>
