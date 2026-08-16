@@ -99,7 +99,10 @@ fun FidoMainScreen() {
     }
 
     fun toast(message: String) {
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        // Toast must be shown on a thread with a Looper; always hop to main.
+        (context as? MainActivity)?.runOnUiThread {
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        }
     }
 
     Scaffold(
