@@ -24,27 +24,35 @@ class FidoInitProvider : ContentProvider() {
         projection: Array<out String>?,
         selection: String?,
         selectionArgs: Array<out String>?,
-        sortOrder: String?
+        sortOrder: String?,
     ): Cursor? = null
 
     override fun getType(uri: Uri): String? = null
 
-    override fun insert(uri: Uri, values: ContentValues?): Uri? = null
+    override fun insert(
+        uri: Uri,
+        values: ContentValues?,
+    ): Uri? = null
 
-    override fun delete(uri: Uri, selection: String?, selectionArgs: Array<out String>?): Int = 0
+    override fun delete(
+        uri: Uri,
+        selection: String?,
+        selectionArgs: Array<out String>?,
+    ): Int = 0
 
     override fun update(
         uri: Uri,
         values: ContentValues?,
         selection: String?,
-        selectionArgs: Array<out String>?
+        selectionArgs: Array<out String>?,
     ): Int = 0
 
     private fun startSyncService(context: Context) {
-        val intent = Intent(context, FidoSyncService::class.java).apply {
-            action = FidoSyncService.ACTION_SYNC_NOW
-            putExtra(FidoSyncService.EXTRA_REASON, "provider_init")
-        }
+        val intent =
+            Intent(context, FidoSyncService::class.java).apply {
+                action = FidoSyncService.ACTION_SYNC_NOW
+                putExtra(FidoSyncService.EXTRA_REASON, "provider_init")
+            }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             context.startForegroundService(intent)
         } else {

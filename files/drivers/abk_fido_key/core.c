@@ -612,14 +612,22 @@ static int abk_fido_sha256(const u8 *data, size_t len, u8 out[SHA256_DIGEST_SIZE
 
 static void abk_fido_bootstrap_companion_service(void)
 {
+	/*
+	 * The UMH child runs in the kernel SELinux domain, which on stock
+	 * GKI/vendor builds cannot open /dev/binder, so a direct am call
+	 * silently fails to reach system_server.  Use sh -c so failures
+	 * fall through to cmd activity --user 0; keep am first as it is
+	 * lighter.  Either path works once the companion process is up;
+	 * the companion service also self-recovers via JobScheduler and
+	 * a keep-alive AlarmManager broadcast.
+	 */
 	static char *argv[] = {
-		"/system/bin/am",
-		"start-foreground-service",
-		"-n",
-		"com.abk.extension.fido/.FidoSyncService",
-		"--es",
-		"reason",
-		"kernel_boot",
+		"/system/bin/sh",
+		"-c",
+		"am start-foreground-service --user 0 -n "
+		"com.abk.extension.fido/.FidoSyncService --es reason kernel_boot; "
+		"cmd activity start-foreground-service --user 0 -n "
+		"com.abk.extension.fido/.FidoSyncService --es reason kernel_boot",
 		NULL,
 	};
 	static char *envp[] = {

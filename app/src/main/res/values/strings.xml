@@ -11,5 +11,8 @@
     <string name="auth_prompt_subtitle">Approve security key access for %1$s</string>
     <string name="auth_biometric_unavailable">No biometric verification available. FIDO request rejected.</string>
     <string name="auth_biometric_denied">Biometric verification failed. FIDO request rejected.</string>
-    <string name="auth_prompt_launch_failed">Unable to launch biometric prompt. Opening ABK extension page.</string>
+    <string name="auth_prompt_launch_failed">Unable to launch biometric prompt. FIDO request rejected.</string>
+    <string name="auth_channel_name">FIDO auth requests</string>
+    <string name="auth_notify_title">FIDO authentication request</string>
+    <string name="auth_notify_text">%1$s for %2$s — tap to open companion and approve</string>
 </resources>

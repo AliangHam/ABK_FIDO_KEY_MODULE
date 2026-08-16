@@ -11,10 +11,11 @@ import android.os.Build
 
 class FidoKeepAliveJobService : JobService() {
     override fun onStartJob(params: JobParameters?): Boolean {
-        val intent = Intent(this, FidoSyncService::class.java).apply {
-            action = FidoSyncService.ACTION_SYNC_NOW
-            putExtra(FidoSyncService.EXTRA_REASON, "job_keepalive")
-        }
+        val intent =
+            Intent(this, FidoSyncService::class.java).apply {
+                action = FidoSyncService.ACTION_SYNC_NOW
+                putExtra(FidoSyncService.EXTRA_REASON, "job_keepalive")
+            }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(intent)
         } else {
@@ -32,10 +33,12 @@ class FidoKeepAliveJobService : JobService() {
         fun schedule(context: Context) {
             val scheduler = context.getSystemService(JobScheduler::class.java) ?: return
             val component = ComponentName(context, FidoKeepAliveJobService::class.java)
-            val info = JobInfo.Builder(JOB_ID, component)
-                .setPersisted(true)
-                .setPeriodic(15 * 60 * 1000L)
-                .build()
+            val info =
+                JobInfo
+                    .Builder(JOB_ID, component)
+                    .setPersisted(true)
+                    .setPeriodic(15 * 60 * 1000L)
+                    .build()
             scheduler.schedule(info)
         }
     }

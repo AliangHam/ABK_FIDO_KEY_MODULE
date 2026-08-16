@@ -3,6 +3,7 @@ package com.abk.extension.fido
 import android.util.Log
 
 private const val SYSFS_BASE = "/sys/kernel/abk_fido_key"
+private const val AUTH_GATE_PATH = "$SYSFS_BASE/auth_gate_enabled"
 private const val AUTH_PENDING_PATH = "$SYSFS_BASE/auth_pending"
 private const val AUTH_REQUEST_ID_PATH = "$SYSFS_BASE/auth_request_id"
 private const val AUTH_CONTEXT_PATH = "$SYSFS_BASE/auth_context"
@@ -23,6 +24,16 @@ internal data class PendingAuthRequest(
 )
 
 internal object FidoKernelBridge {
+    fun readAuthGate(): Boolean? =
+        RootShell
+            .readTextFile(AUTH_GATE_PATH)
+            .stdout
+            .trim()
+            .toIntOrNull()
+            ?.let { it == 1 }
+
+    fun setAuthGate(enabled: Boolean): RootShell.CommandResult = RootShell.writeTextFile(AUTH_GATE_PATH, if (enabled) "1\n" else "0\n")
+
     fun readPendingAuthRequest(): PendingAuthRequest? {
         val pending = RootShell.readTextFile(AUTH_PENDING_PATH)
         if (!pending.success) {
@@ -48,13 +59,13 @@ internal object FidoKernelBridge {
         }
 
         val raw = context.stdout.trim()
-        val values = raw
-            .split(' ')
-            .mapNotNull { token ->
-                val idx = token.indexOf('=')
-                if (idx <= 0) null else token.substring(0, idx) to token.substring(idx + 1)
-            }
-            .toMap()
+        val values =
+            raw
+                .split(' ')
+                .mapNotNull { token ->
+                    val idx = token.indexOf('=')
+                    if (idx <= 0) null else token.substring(0, idx) to token.substring(idx + 1)
+                }.toMap()
 
         return PendingAuthRequest(
             requestId = requestIdValue,
@@ -65,28 +76,35 @@ internal object FidoKernelBridge {
         )
     }
 
-    fun allow(requestId: Int): RootShell.CommandResult =
-        RootShell.writeTextFile(AUTH_DECISION_PATH, "allow $requestId\n")
+    fun allow(requestId: Int): RootShell.CommandResult = RootShell.writeTextFile(AUTH_DECISION_PATH, "allow $requestId\n")
 
-    fun deny(requestId: Int): RootShell.CommandResult =
-        RootShell.writeTextFile(AUTH_DECISION_PATH, "deny $requestId\n")
+    fun deny(requestId: Int): RootShell.CommandResult = RootShell.writeTextFile(AUTH_DECISION_PATH, "deny $requestId\n")
 
-    fun readLastError(): String =
-        RootShell.readTextFile(LAST_ERROR_PATH).stdout.trim()
+    fun readLastError(): String = RootShell.readTextFile(LAST_ERROR_PATH).stdout.trim()
 
-    fun readLastTrace(): String =
-        RootShell.readTextFile(LAST_TRACE_PATH).stdout.trim()
+    fun readLastTrace(): String = RootShell.readTextFile(LAST_TRACE_PATH).stdout.trim()
 
     fun readCredentialCount(): Int? =
-        RootShell.readTextFile(CREDENTIAL_COUNT_PATH).stdout.trim().toIntOrNull()
+        RootShell
+            .readTextFile(CREDENTIAL_COUNT_PATH)
+            .stdout
+            .trim()
+            .toIntOrNull()
 
     fun readStoreGeneration(): Int? =
-        RootShell.readTextFile(STORE_GENERATION_PATH).stdout.trim().toIntOrNull()
+        RootShell
+            .readTextFile(STORE_GENERATION_PATH)
+            .stdout
+            .trim()
+            .toIntOrNull()
 
-    fun restoreMetadata(): RootShell.CommandResult =
-        RootShell.writeTextFile(RESTORE_METADATA_PATH, "1\n")
+    fun restoreMetadata(): RootShell.CommandResult = RootShell.writeTextFile(RESTORE_METADATA_PATH, "1\n")
 
-    fun waitForCredentialCountAtLeast(target: Int, attempts: Int = 20, delayMs: Long = 200): Int? {
+    fun waitForCredentialCountAtLeast(
+        target: Int,
+        attempts: Int = 20,
+        delayMs: Long = 200,
+    ): Int? {
         repeat(attempts) {
             val count = readCredentialCount()
             if (count != null && count >= target) {

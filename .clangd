@@ -1,0 +1,8 @@
+# Local LSP (clangd) only. The kernel build installs this header into the
+# kernel include tree via scripts/abk_fido_setup.sh; this makes standalone
+# editing/checking resolve it without a full kernel tree.
+CompileFlags:
+  Add:
+    - "-Ifiles/include"
+    - "-Ifiles/include/linux"
+    - "-Ifiles/drivers/abk_fido_key"
